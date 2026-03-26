@@ -37,6 +37,9 @@ inline void gl_debug(const char *file, int line)
 
 #undef GL_ERROR_CASE
 
+bool game_running = false;
+int move_dir = 0;
+bool fire_pressed = 0;
 struct Buffer
 {
     size_t width, height;
@@ -69,17 +72,16 @@ struct Game
     Player player;
 };
 
-
-struct SpriteAnimation {
+struct SpriteAnimation
+{
     bool loop;
     size_t num_frames;
     size_t frame_duration;
     size_t time;
-    Sprite** frames;
+    Sprite **frames;
 };
 
-void
-error_callback(int error, const char *description)
+void error_callback(int error, const char *description)
 {
     fprintf(stderr, "Error: %s\n", description);
 };
@@ -154,6 +156,19 @@ bool sprite_overlap_check(
     return false;
 }
 
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
+{
+    switch (key)
+    {
+    case GLFW_KEY_ESCAPE:
+        if (action == GLFW_PRESS)
+            game_running = false;
+        break;
+    default:
+        break;
+    }
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -176,6 +191,7 @@ int main(int argc, char *argv[])
         glfwTerminate();
         return -1;
     }
+    glfwSetKeyCallback(window, key_callback);
     glfwMakeContextCurrent(window);
 
     GLenum err = glewInit();
@@ -196,6 +212,7 @@ int main(int argc, char *argv[])
     printf("Renderer used: %s\n", glGetString(GL_RENDERER));
     printf("Shading Language: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 
+    glfwSwapInterval(1);
     glClearColor(1.0, 0.0, 0.0, 1.0);
 
     uint32_t clear_color = rgb_to_uint32(0, 128, 0);
@@ -292,10 +309,10 @@ int main(int argc, char *argv[])
 
     glBindVertexArray(fullscreen_triangle_vao);
 
-    Sprite alien_sprite;
-    alien_sprite.width = 11;
-    alien_sprite.height = 8;
-    alien_sprite.data = new uint8_t[11 * 8]{
+    Sprite alien_sprite0;
+    alien_sprite0.width = 11;
+    alien_sprite0.height = 8;
+    alien_sprite0.data = new uint8_t[11 * 8]{
         0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, // ..@.....@..
         0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, // ...@...@...
         0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, // ..@@@@@@@..
@@ -306,17 +323,113 @@ int main(int argc, char *argv[])
         0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0  // ...@@.@@...
     };
 
+    Sprite alien_sprite1;
+    alien_sprite1.width = 11;
+    alien_sprite1.height = 8;
+    alien_sprite1.data = new uint8_t[88]{
+        0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, // ..@.....@..
+        1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, // @..@...@..@
+        1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, // @.@@@@@@@.@
+        1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, // @@@.@@@.@@@
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // @@@@@@@@@@@
+        0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, // .@@@@@@@@@.
+        0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, // ..@.....@..
+        0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0  // .@.......@.
+    };
+
+    SpriteAnimation *alien_animation = new SpriteAnimation;
+
+    alien_animation->loop = true;
+    alien_animation->num_frames = 2;
+    alien_animation->frame_duration = 10;
+    alien_animation->time = 0;
+
+    alien_animation->frames = new Sprite *[2];
+    alien_animation->frames[0] = &alien_sprite0;
+    alien_animation->frames[1] = &alien_sprite1;
+
+    int player_move_dir = 1;
     Sprite player_sprite;
     player_sprite.width = 11;
     player_sprite.height = 7;
     player_sprite.data = new uint8_t[77]{
-        0,0,0,0,0,1,0,0,0,0,0, // .....@.....
-        0,0,0,0,1,1,1,0,0,0,0, // ....@@@....
-        0,0,0,0,1,1,1,0,0,0,0, // ....@@@....
-        0,1,1,1,1,1,1,1,1,1,0, // .@@@@@@@@@.
-        1,1,1,1,1,1,1,1,1,1,1, // @@@@@@@@@@@
-        1,1,1,1,1,1,1,1,1,1,1, // @@@@@@@@@@@
-        1,1,1,1,1,1,1,1,1,1,1, // @@@@@@@@@@@
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0, // .....@.....
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0, // ....@@@....
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0, // ....@@@....
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0, // .@@@@@@@@@.
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1, // @@@@@@@@@@@
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1, // @@@@@@@@@@@
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1, // @@@@@@@@@@@
     };
 
     Game game;
@@ -339,16 +452,21 @@ int main(int argc, char *argv[])
         }
     }
 
-    while (!glfwWindowShouldClose(window))
+    game_running = truel while (!glfwWindowShouldClose(window) && game_running)
     {
         buffer_clear(&buffer, clear_color);
         for (size_t ai = 0; ai < game.num_aliens; ++ai)
         {
             const Alien &alien = game.aliens[ai];
-            buffer_sprite_draw(&buffer, alien_sprite, alien.x, alien.y, rgb_to_uint32(128, 0, 0));
+            size_t current_frame = alien_animation->time / alien_animation->frame_duration;
+            const Sprite &sprite = *alien_animation->frames[current_frame];
+
+            // buffer_sprite_draw(&buffer, alien_sprite, alien.x, alien.y, rgb_to_uint32(128, 0, 0));
+            buffer_sprite_draw(&buffer, sprite, alien.x, alien.y, rgb_to_uint32(128, 0, 0));
         }
 
         buffer_sprite_draw(&buffer, player_sprite, game.player.x, game.player.y, rgb_to_uint32(128, 0, 0));
+
         glTexSubImage2D(
             GL_TEXTURE_2D, 0, 0, 0,
             buffer.width, buffer.height,
@@ -356,6 +474,33 @@ int main(int argc, char *argv[])
             buffer.data);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glfwSwapBuffers(window);
+
+        ++alien_animation->time;
+        if (alien_animation->time == alien_animation->num_frames * alien_animation->frame_duration)
+        {
+            if (alien_animation->loop)
+                alien_animation->time = 0;
+            else
+            {
+                delete alien_animation;
+                alien_animation = nullptr;
+            }
+        }
+
+        if (game.player.x + player_sprite.width + player_move_dir >= game.width - 1)
+        {
+            game.player.x = game.width - player_sprite.width - player_move_dir - 1;
+            player_move_dir *= -1;
+        }
+        else if ((int)game.player.x + player_move_dir <= 0)
+        {
+            game.player.x = 0;
+            player_move_dir *= -1;
+        }
+        else
+        {
+            game.player.x += player_move_dir;
+        }
 
         glfwPollEvents();
     }
@@ -365,7 +510,12 @@ int main(int argc, char *argv[])
 
     glDeleteVertexArrays(1, &fullscreen_triangle_vao);
 
-    delete[] alien_sprite.data;
+    delete[] alien_sprite0.data;
+    delete[] alien_sprite1.data;
+    delete[] alien_animation->frames;
+    delete[] game.aliens;
     delete[] buffer.data;
+
+    delete alien_animation;
     return 0;
 }
