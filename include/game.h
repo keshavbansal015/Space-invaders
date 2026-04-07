@@ -47,5 +47,11 @@ bool sprite_overlap_check(
 // Entity updates
 void update_player(Game *game, int move_dir, size_t player_width);
 void update_bullets(Game *game, size_t bullet_height);
+// void update_alients(Game *game, size_t bullet_width, size_t bullet_height,
+                    // size_t alien_width, size_t alien_height);
+void update_aliens(Game *game, uint8_t *death_counters);
+void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
+                      size_t alien_width, size_t alien_height,
+                      size_t death_width, size_t *score);
 
 #endif

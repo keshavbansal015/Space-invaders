@@ -1,15 +1,25 @@
 #include "common.h"
 #include "game.h"
 
+// bool sprite_overlap_check(
+//     const Sprite &sp_a, size_t x_a, size_t y_a,
+//     const Sprite &sp_b, size_t x_b, size_t y_b)
+// {
+//     if (x_a < x_b + sp_b.width && x_a + sp_a.width > x_b &&
+//         y_a < y_b + sp_b.height && y_a + sp_a.height > y_b)
+//         return true;
+//     return false;
+// }
 bool sprite_overlap_check(
-    const Sprite &sp_a, size_t x_a, size_t y_a,
-    const Sprite &sp_b, size_t x_b, size_t y_b)
+    size_t x_a, size_t y_a, size_t width_a, size_t height_a,
+    size_t x_b, size_t y_b, size_t width_b, size_t height_b)
 {
-    if (x_a < x_b + sp_b.width && x_a + sp_a.width > x_b &&
-        y_a < y_b + sp_b.height && y_a + sp_a.height > y_b)
+    if (x_a < x_b + width_b && x_a + width_a > x_b &&
+        y_a < y_b + height_b && y_a + height_a > y_b)
         return true;
     return false;
 }
+
 
 void update_player(Game *game, int move_dir, size_t player_width)
 {

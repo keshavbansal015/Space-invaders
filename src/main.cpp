@@ -14,80 +14,184 @@ int move_dir = 0;
 bool fire_pressed = false;
 size_t score = 0;
 
-//: Include your existing key_callback and error_callback here.
+// key_callback and error_callback here.
+void error_callback(int error, const char *description)
+{
+    fprintf(stderr, "Error: %s\n", description);
+};
 
-int main(int argc, char *argv[]) {
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        game_running = false;
+
+    if (key == GLFW_KEY_RIGHT)
+    {
+        if (action == GLFW_PRESS)
+            move_dir += 1;
+        else if (action == GLFW_RELEASE)
+            move_dir -= 1;
+    }
+    if (key == GLFW_KEY_LEFT)
+    {
+        if (action == GLFW_PRESS)
+            move_dir -= 1;
+        else if (action == GLFW_RELEASE)
+            move_dir += 1;
+    }
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        fire_pressed = true;
+}
+
+int main(int argc, char *argv[])
+{
     const size_t buffer_width = 224;
     const size_t buffer_height = 256;
 
     // 1. Initialization
-    if (!glfwInit()) return -1;
+    glfwSetErrorCallback(error_callback);
+    if (!glfwInit())
+        return -1;
+
     // ... (Set window hints for OpenGL 3.3 Core Profile)
-    GLFWwindow* window = glfwCreateWindow(buffer_width, buffer_height, "Space Invaders", NULL, NULL);
-    if (!window) { glfwTerminate(); return -1; }
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+    GLFWwindow *window = glfwCreateWindow(buffer_width, buffer_height, "Space Invaders", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
+    }
+
+    glfwSetKeyCallback(window, key_callback);
     glfwMakeContextCurrent(window);
     glewInit();
+    glfwSwapInterval(1);
 
     // 2. Buffer & Renderer Setup
     Buffer buffer;
     buffer.width = buffer_width;
     buffer.height = buffer_height;
     buffer.data = new uint32_t[buffer.width * buffer.height];
+    uint32_t clear_color = rgb_to_uint32(0, 128, 0);
 
-    //: Initialize your textures, VAOs, and Shaders using renderer.h utilities.
-    
+    //: Initialize textures, VAOs, and Shaders using renderer.h utilities.
+    GLuint buffer_texture;
+    glGenTextures(1, &buffer_texture);
+    glBindTexture(GL_TEXTURE_2D, buffer_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, buffer.width, buffer.height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, buffer.data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     // 3. Asset Mapping (Static constants from sprites.cpp)
-    Sprite player_sprite = { 11, 7, (uint8_t*)PLAYER_SPRITE_DATA };
-    Sprite bullet_sprite = { 1, 3, (uint8_t*)BULLET_SPRITE_DATA };
-    Sprite alien_death_sprite = { 13, 7, (uint8_t*)ALIEN_DEATH_SPRITE_DATA };
+    // Initialize Assets from sprites.cpp
+    Sprite text_spritesheet = {5, 7, (uint8_t *)TEXT_SPRITESHEET_DATA};
+    Sprite number_spritesheet = {5, 7, (uint8_t *)TEXT_SPRITESHEET_DATA + (16 * 35)};
+    Sprite player_sprite = {11, 7, (uint8_t *)PLAYER_SPRITE_DATA};
+    Sprite bullet_sprite = {1, 3, (uint8_t *)BULLET_SPRITE_DATA};
+    Sprite alien_death_sprite = {13, 7, (uint8_t *)ALIEN_DEATH_SPRITE_DATA};
 
-    // 4. Game State
+    // Alien Animation Frames
+    Sprite alien_sprites[6];
+    alien_sprites[0] = {8, 8, (uint8_t *)ALIEN_SPRITE_0_DATA};
+    alien_sprites[1] = {8, 8, (uint8_t *)ALIEN_SPRITE_1_DATA};
+    alien_sprites[2] = {11, 8, (uint8_t *)ALIEN_SPRITE_2_DATA};
+    alien_sprites[3] = {11, 8, (uint8_t *)ALIEN_SPRITE_3_DATA};
+    alien_sprites[4] = {12, 8, (uint8_t *)ALIEN_SPRITE_4_DATA};
+    alien_sprites[5] = {12, 8, (uint8_t *)ALIEN_SPRITE_5_DATA};
+
+    SpriteAnimation alien_animation[3];
+    for (int i = 0; i < 3; ++i)
+    {
+        alien_animation[i] = {true, 2, 10, 0, new Sprite *[2]};
+        alien_animation[i].frames[0] = &alien_sprites[2 * i];
+        alien_animation[i].frames[1] = &alien_sprites[2 * i + 1];
+    }
+
+    // Initialize Game State
     Game game;
     game.width = buffer_width;
     game.height = buffer_height;
     game.num_bullets = 0;
     game.num_aliens = 55;
     game.aliens = new Alien[game.num_aliens];
-    game.player = { 112 - 5, 32, 3 };
+    game.player = {112 - 5, 32, 3};
 
-    //: Initialize alien positions in a grid here.
+    //: Initialize alien positions in a grid.
+    for (size_t yi = 0; yi < 5; ++yi)
+    {
+        for (size_t xi = 0; xi < 11; ++xi)
+        {
+            Alien &alien = game.aliens[yi * 11 + xi];
+            alien.type = (5 - yi) / 2 + 1;
+            alien.x = 16 * xi + 20;
+            alien.y = 17 * yi + 128;
+        }
+    }
 
     uint8_t *death_counters = new uint8_t[game.num_aliens];
-    for (size_t i = 0; i < game.num_aliens; ++i) death_counters[i] = 10;
+    for (size_t i = 0; i < game.num_aliens; ++i)
+        death_counters[i] = 10;
 
     game_running = true;
 
-    while (!glfwWindowShouldClose(window) && game_running) {
-        // A. Simulation (Model)
+    // --- Main Loop ---
+    while (!glfwWindowShouldClose(window) && game_running)
+    {
+        // 1. SIMULATION (Using game.cpp functions)
         update_player(&game, move_dir, player_sprite.width);
         update_bullets(&game, bullet_sprite.height);
-        check_collisions(&game, bullet_sprite.width, bullet_sprite.height, 
+
+        // Pass relevant widths for collision math
+        check_collisions(&game, bullet_sprite.width, bullet_sprite.height,
                          11, 8, alien_death_sprite.width, &score);
+
         update_aliens(&game, death_counters);
 
-        if (fire_pressed && game.num_bullets < GAME_MAX_BULLETS) {
-            game.bullets[game.num_bullets] = { game.player.x + player_sprite.width / 2, game.player.y + player_sprite.height, 2 };
+        if (fire_pressed && game.num_bullets < GAME_MAX_BULLETS)
+        {
+            game.bullets[game.num_bullets] = {game.player.x + player_sprite.width / 2, game.player.y + player_sprite.height, 2};
             game.num_bullets++;
             fire_pressed = false;
         }
 
-        // B. Rendering (View)
-        buffer_clear(&buffer, rgb_to_uint32(0, 128, 0));
-        
-        // Draw loop for Aliens
-        for (size_t ai = 0; ai < game.num_aliens; ++ai) {
-            if (!death_counters[ai]) continue;
-            if (game.aliens[ai].type == ALIEN_DEAD) {
-                buffer_draw_sprite(&buffer, alien_death_sprite, game.aliens[ai].x, game.aliens[ai].y, rgb_to_uint32(128, 0, 0));
-            } else {
-                // Use alien_animation logic here
+        // 2. RENDERING
+        buffer_clear(&buffer, clear_color);
+
+        // UI
+        buffer_draw_text(&buffer, text_spritesheet, "SCORE", 4, game.height - 15, rgb_to_uint32(255, 255, 255));
+        buffer_draw_number(&buffer, number_spritesheet, score, 40, game.height - 15, rgb_to_uint32(255, 255, 255));
+
+        // Entities
+        for (size_t ai = 0; ai < game.num_aliens; ++ai)
+        {
+            if (!death_counters[ai])
+                continue;
+            const Alien &alien = game.aliens[ai];
+            if (alien.type == ALIEN_DEAD)
+            {
+                buffer_draw_sprite(&buffer, alien_death_sprite, alien.x, alien.y, rgb_to_uint32(255, 0, 0));
+            }
+            else
+            {
+                SpriteAnimation &anim = alien_animation[alien.type - 1];
+                buffer_draw_sprite(&buffer, *anim.frames[anim.time / anim.frame_duration], alien.x, alien.y, rgb_to_uint32(255, 255, 255));
+                // Update animation timer
+                anim.time = (anim.time + 1) % (anim.num_frames * anim.frame_duration);
             }
         }
 
-        //: Draw bullets and player.
+        for (size_t bi = 0; bi < game.num_bullets; ++bi)
+        {
+            buffer_draw_sprite(&buffer, bullet_sprite, game.bullets[bi].x, game.bullets[bi].y, rgb_to_uint32(255, 255, 0));
+        }
 
-        // C. Display
+        buffer_draw_sprite(&buffer, player_sprite, game.player.x, game.player.y, rgb_to_uint32(0, 255, 0));
+
+        // 3. DISPLAY
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, buffer.width, buffer.height, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, buffer.data);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -99,6 +203,9 @@ int main(int argc, char *argv[]) {
     delete[] buffer.data;
     delete[] game.aliens;
     delete[] death_counters;
+    for (int i = 0; i < 3; ++i)
+        delete[] alien_animation[i].frames;
+
     glfwTerminate();
     return 0;
 }

@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "common.h"
+#include <cstdlib> 
 #include <cstdio>
 #include <GL/glew.h>
 
@@ -118,7 +119,7 @@ void buffer_draw_number(
     }
 }
 
-void validate_shader(GLuint shader, const char *file = 0)
+void validate_shader(GLuint shader, const char *file)
 {
     static const unsigned int BUFFER_SIZE = 512;
     char buffer[BUFFER_SIZE];
@@ -144,4 +145,22 @@ bool validate_program(GLuint program)
         return false;
     }
     return true;
+}
+
+char *load_shader_source(const char *path)
+{
+    FILE *file = fopen(path, "rb");
+    if (!file)
+        return NULL;
+
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *buffer = (char *)malloc(length + 1);
+    fread(buffer, 1, length, file);
+    buffer[length] = '\0';
+
+    fclose(file);
+    return buffer;
 }

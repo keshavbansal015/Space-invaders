@@ -43,5 +43,6 @@ void buffer_draw_number(Buffer *buffer, const Sprite &number_spritesheet, size_t
 // Shader Management
 void validate_shader(GLuint shader, const char *file = 0);
 bool validate_program(GLuint program);
+char *load_shader_source(const char *path);
 
 #endif

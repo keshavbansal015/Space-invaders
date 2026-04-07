@@ -177,34 +177,7 @@ void error_callback(int error, const char *description)
 //     return false;
 // }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
-    switch (key)
-    {
-    case GLFW_KEY_ESCAPE:
-        if (action == GLFW_PRESS)
-            game_running = false;
-        break;
-    case GLFW_KEY_RIGHT:
-        if (action == GLFW_PRESS)
-            move_dir += 1;
-        else if (action == GLFW_RELEASE)
-            move_dir -= 1;
-        break;
-    case GLFW_KEY_LEFT:
-        if (action == GLFW_PRESS)
-            move_dir -= 1;
-        else if (action == GLFW_RELEASE)
-            move_dir += 1;
-        break;
-    case GLFW_KEY_SPACE:
-        if (action == GLFW_RELEASE)
-            fire_pressed = true;
-        break;
-    default:
-        break;
-    }
-}
+
 
 // void buffer_draw_text(
 //     Buffer *buffer,
@@ -321,33 +294,33 @@ int main(int argc, char *argv[])
     GLuint fullscreen_triangle_vao;
     glGenVertexArrays(1, &fullscreen_triangle_vao);
 
-    // Create shader for displaying buffer
-    static const char *fragment_shader =
-        "\n"
-        "#version 330\n"
-        "\n"
-        "uniform sampler2D buffer;\n"
-        "noperspective in vec2 TexCoord;\n"
-        "\n"
-        "out vec3 outColor;\n"
-        "\n"
-        "void main(void){\n"
-        "    outColor = texture(buffer, TexCoord).rgb;\n"
-        "}\n";
+    // // Create shader for displaying buffer
+    // static const char *fragment_shader =
+    //     "\n"
+    //     "#version 330\n"
+    //     "\n"
+    //     "uniform sampler2D buffer;\n"
+    //     "noperspective in vec2 TexCoord;\n"
+    //     "\n"
+    //     "out vec3 outColor;\n"
+    //     "\n"
+    //     "void main(void){\n"
+    //     "    outColor = texture(buffer, TexCoord).rgb;\n"
+    //     "}\n";
 
-    static const char *vertex_shader =
-        "\n"
-        "#version 330\n"
-        "\n"
-        "noperspective out vec2 TexCoord;\n"
-        "\n"
-        "void main(void){\n"
-        "\n"
-        "    TexCoord.x = (gl_VertexID == 2)? 2.0: 0.0;\n"
-        "    TexCoord.y = (gl_VertexID == 1)? 2.0: 0.0;\n"
-        "    \n"
-        "    gl_Position = vec4(2.0 * TexCoord - 1.0, 0.0, 1.0);\n"
-        "}\n";
+    // static const char *vertex_shader =
+    //     "\n"
+    //     "#version 330\n"
+    //     "\n"
+    //     "noperspective out vec2 TexCoord;\n"
+    //     "\n"
+    //     "void main(void){\n"
+    //     "\n"
+    //     "    TexCoord.x = (gl_VertexID == 2)? 2.0: 0.0;\n"
+    //     "    TexCoord.y = (gl_VertexID == 1)? 2.0: 0.0;\n"
+    //     "    \n"
+    //     "    gl_Position = vec4(2.0 * TexCoord - 1.0, 0.0, 1.0);\n"
+    //     "}\n";
 
     GLuint shader_id = glCreateProgram();
 
