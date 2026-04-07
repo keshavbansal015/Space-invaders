@@ -1,15 +1,6 @@
 #include "common.h"
 #include "game.h"
 
-// bool sprite_overlap_check(
-//     const Sprite &sp_a, size_t x_a, size_t y_a,
-//     const Sprite &sp_b, size_t x_b, size_t y_b)
-// {
-//     if (x_a < x_b + sp_b.width && x_a + sp_a.width > x_b &&
-//         y_a < y_b + sp_b.height && y_a + sp_a.height > y_b)
-//         return true;
-//     return false;
-// }
 bool sprite_overlap_check(
     size_t x_a, size_t y_a, size_t width_a, size_t height_a,
     size_t x_b, size_t y_b, size_t width_b, size_t height_b)
@@ -20,7 +11,7 @@ bool sprite_overlap_check(
     return false;
 }
 
-
+// move_dir -> +1 = right, -1 = left, move 2 pixels at a time
 void update_player(Game *game, int move_dir, size_t player_width)
 {
     int player_move_speed = 2 * move_dir;
@@ -35,9 +26,10 @@ void update_player(Game *game, int move_dir, size_t player_width)
     }
 }
 
+// bullet->dir = 2 -> Up (to the monsters), 
 void update_bullets(Game *game, size_t bullet_height)
 {
-    for (size_t bi = 0; bi < game->num_bullets;)
+    for (size_t bi = 0; bi < game->num_bullets; )
     {
         game->bullets[bi].y += game->bullets[bi].dir;
 
@@ -67,26 +59,27 @@ void update_aliens(Game *game, uint8_t *death_counters)
     }
 }
 
-void check_collisions(Game *game, size_t bullet_width, size_t bullet_height, 
-                      size_t alien_width, size_t alien_height, 
+void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
+                      size_t alien_width, size_t alien_height,
                       size_t death_width, size_t *score)
 {
     for (size_t bi = 0; bi < game->num_bullets;)
     {
         bool bullet_destroyed = false;
-        
+
         for (size_t ai = 0; ai < game->num_aliens; ++ai)
         {
             Alien &alien = game->aliens[ai];
-            if (alien.type == ALIEN_DEAD) continue;
+            if (alien.type == ALIEN_DEAD)
+                continue;
 
             if (sprite_overlap_check(
-                game->bullets[bi].x, game->bullets[bi].y, bullet_width, bullet_height,
-                alien.x, alien.y, alien_width, alien_height))
+                    game->bullets[bi].x, game->bullets[bi].y, bullet_width, bullet_height,
+                    alien.x, alien.y, alien_width, alien_height))
             {
                 // Increase score based on alien rank (Type 3 = bottom, Type 1 = top)
                 *score += 10 * (4 - alien.type);
-                
+
                 // Mark as dead and recenter for the death sprite
                 alien.type = ALIEN_DEAD;
                 alien.x -= (death_width - alien_width) / 2;
@@ -94,7 +87,7 @@ void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
                 // Remove bullet via swap-to-back
                 game->bullets[bi] = game->bullets[game->num_bullets - 1];
                 --game->num_bullets;
-                
+
                 bullet_destroyed = true;
                 break; // This bullet is gone, stop checking other aliens
             }

@@ -68,15 +68,36 @@ int main(int argc, char *argv[])
 
     glfwSetKeyCallback(window, key_callback);
     glfwMakeContextCurrent(window);
-    glewInit();
+    GLenum err = glewInit();
+    if (err != GLEW_OK)
+    {
+        fprintf(stderr, "Error initializing GLEW.\n");
+        glfwTerminate();
+        return -1;
+    }
+
+    int glVersion[2] = {-1, 1};
+    glGetIntegerv(GL_MAJOR_VERSION, &glVersion[0]);
+    glGetIntegerv(GL_MINOR_VERSION, &glVersion[1]);
+
+    gl_debug(__FILE__, __LINE__);
+
+    // printf("Using OpenGL: %d.%d\n", glVersion[0], glVersion[1]);
+    // printf("Renderer used: %s\n", glGetString(GL_RENDERER));
+    // printf("Shading Language: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+
     glfwSwapInterval(1);
+    glClearColor(1.0, 0.0, 0.0, 1.0);
+    uint32_t clear_color = rgb_to_uint32(0, 128, 0);
 
     // 2. Buffer & Renderer Setup
     Buffer buffer;
     buffer.width = buffer_width;
     buffer.height = buffer_height;
     buffer.data = new uint32_t[buffer.width * buffer.height];
-    uint32_t clear_color = rgb_to_uint32(0, 128, 0);
+
+    // How to make sure that it is linked properly?
+    buffer_clear(&buffer, 0);
 
     //: Initialize textures, VAOs, and Shaders using renderer.h utilities.
     GLuint buffer_texture;
@@ -85,6 +106,61 @@ int main(int argc, char *argv[])
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, buffer.width, buffer.height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, buffer.data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    GLuint fullscreen_triangle_vao;
+    glGenVertexArrays(1, &fullscreen_triangle_vao);
+
+    // Check if this is okay
+    static const char *vertex_shader = load_shader_source("./shaders/vertex_shader.glsl");
+    static const char *fragment_shader = load_shader_source("./shaders/fragment_shader.glsl");
+
+    GLuint shader_id = glCreateProgram();
+
+    // create vertex shader
+    {
+        GLuint shader_vp = glCreateShader(GL_VERTEX_SHADER);
+
+        glShaderSource(shader_vp, 1, &vertex_shader, 0);
+        glCompileShader(shader_vp);
+        validate_shader(shader_vp, vertex_shader);
+        glAttachShader(shader_id, shader_vp);
+
+        glDeleteShader(shader_vp);
+    }
+
+    // create fragment shader
+    {
+        GLuint shader_fp = glCreateShader(GL_FRAGMENT_SHADER);
+
+        glShaderSource(shader_fp, 1, &fragment_shader, 0);
+        glCompileShader(shader_fp);
+        validate_shader(shader_fp, fragment_shader);
+        glAttachShader(shader_id, shader_fp);
+
+        glDeleteShader(shader_fp);
+    }
+
+    glLinkProgram(shader_id);
+    if (!validate_program(shader_id))
+    {
+        fprintf(stderr, "Error while validating shader.\n");
+        glfwTerminate();
+        glDeleteVertexArrays(1, &fullscreen_triangle_vao);
+        delete[] buffer.data;
+        return -1;
+    }
+
+    glUseProgram(shader_id);
+
+    GLint location = glGetUniformLocation(shader_id, "buffer");
+    glUniform1i(location, 0);
+
+    glDisable(GL_DEPTH_TEST);
+    glActiveTexture(GL_TEXTURE0);
+
+    glBindVertexArray(fullscreen_triangle_vao);
 
     // 3. Asset Mapping (Static constants from sprites.cpp)
     // Initialize Assets from sprites.cpp
@@ -127,6 +203,9 @@ int main(int argc, char *argv[])
         {
             Alien &alien = game.aliens[yi * 11 + xi];
             alien.type = (5 - yi) / 2 + 1;
+
+            // const Sprite &sprite = alien_sprites[2 * (alien.type - 1)];
+
             alien.x = 16 * xi + 20;
             alien.y = 17 * yi + 128;
         }
@@ -137,10 +216,38 @@ int main(int argc, char *argv[])
         death_counters[i] = 10;
 
     game_running = true;
+    int player_move_dir = 0;
 
     // --- Main Loop ---
     while (!glfwWindowShouldClose(window) && game_running)
     {
+
+        buffer_clear(&buffer, clear_color);
+
+        buffer_draw_text(
+            &buffer,
+            text_spritesheet, "SCORE",
+            4, game.height - text_spritesheet.height - 7,
+            rgb_to_uint32(128, 0, 0));
+
+        buffer_draw_number(
+            &buffer,
+            number_spritesheet, score,
+            4 + 2 * number_spritesheet.width, game.height - 2 * number_spritesheet.height - 12,
+            rgb_to_uint32(128, 0, 0));
+
+        buffer_draw_text(
+            &buffer,
+            text_spritesheet, "CREDIT 00",
+            164, 7,
+            rgb_to_uint32(128, 0, 0));
+
+        // Line of separation
+        for (size_t i = 0; i < game.width; ++i)
+        {
+            buffer.data[game.width * 16 + i] = rgb_to_uint32(128, 0, 0);
+        }
+
         // 1. SIMULATION (Using game.cpp functions)
         update_player(&game, move_dir, player_sprite.width);
         update_bullets(&game, bullet_sprite.height);
@@ -159,12 +266,6 @@ int main(int argc, char *argv[])
         }
 
         // 2. RENDERING
-        buffer_clear(&buffer, clear_color);
-
-        // UI
-        buffer_draw_text(&buffer, text_spritesheet, "SCORE", 4, game.height - 15, rgb_to_uint32(255, 255, 255));
-        buffer_draw_number(&buffer, number_spritesheet, score, 40, game.height - 15, rgb_to_uint32(255, 255, 255));
-
         // Entities
         for (size_t ai = 0; ai < game.num_aliens; ++ai)
         {
@@ -206,6 +307,8 @@ int main(int argc, char *argv[])
     for (int i = 0; i < 3; ++i)
         delete[] alien_animation[i].frames;
 
+    glfwDestroyWindow(window);
     glfwTerminate();
+    glDeleteVertexArrays(1, &fullscreen_triangle_vao);
     return 0;
 }
