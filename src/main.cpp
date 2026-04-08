@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -113,8 +114,8 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &fullscreen_triangle_vao);
 
     // Check if this is okay
-    static const char *vertex_shader = load_shader_source("./shaders/vertex_shader.glsl");
-    static const char *fragment_shader = load_shader_source("./shaders/fragment_shader.glsl");
+    const char *vertex_shader = load_shader_source("./shaders/vertex_shader.glsl");
+    const char *fragment_shader = load_shader_source("./shaders/fragment_shader.glsl");
 
     GLuint shader_id = glCreateProgram();
 
@@ -143,6 +144,9 @@ int main(int argc, char *argv[])
     }
 
     glLinkProgram(shader_id);
+    free((void *)vertex_shader);
+    free((void *)fragment_shader);
+
     if (!validate_program(shader_id))
     {
         fprintf(stderr, "Error while validating shader.\n");
@@ -242,12 +246,6 @@ int main(int argc, char *argv[])
             164, 7,
             rgb_to_uint32(128, 0, 0));
 
-        // Line of separation
-        for (size_t i = 0; i < game.width; ++i)
-        {
-            buffer.data[game.width * 16 + i] = rgb_to_uint32(128, 0, 0);
-        }
-
         // 1. SIMULATION (Using game.cpp functions)
         update_player(&game, move_dir, player_sprite.width);
         update_bullets(&game, bullet_sprite.height);
@@ -280,9 +278,13 @@ int main(int argc, char *argv[])
             {
                 SpriteAnimation &anim = alien_animation[alien.type - 1];
                 buffer_draw_sprite(&buffer, *anim.frames[anim.time / anim.frame_duration], alien.x, alien.y, rgb_to_uint32(255, 255, 255));
-                // Update animation timer
-                anim.time = (anim.time + 1) % (anim.num_frames * anim.frame_duration);
             }
+        }
+
+        for (int i = 0; i < 3; ++i)
+        {
+            alien_animation[i].time = (alien_animation[i].time + 1) %
+                                      (alien_animation[i].num_frames * alien_animation[i].frame_duration);
         }
 
         for (size_t bi = 0; bi < game.num_bullets; ++bi)
@@ -293,6 +295,11 @@ int main(int argc, char *argv[])
         buffer_draw_sprite(&buffer, player_sprite, game.player.x, game.player.y, rgb_to_uint32(0, 255, 0));
 
         // 3. DISPLAY
+        // Line of separation
+        for (size_t i = 0; i < game.width; ++i)
+        {
+            buffer.data[game.width * 16 + i] = rgb_to_uint32(128, 0, 0);
+        }
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, buffer.width, buffer.height, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, buffer.data);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

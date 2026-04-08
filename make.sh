@@ -7,5 +7,5 @@ g++ src/main.cpp src/renderer.cpp src/game.cpp src/sprites.cpp \
     -I/opt/homebrew/include \
     -L/opt/homebrew/lib \
     -lGLEW -lglfw -framework OpenGL \
-    -fsanitize=address -g -o game
-
+    -o game
+# -fsanitize=address -g 
