@@ -1,5 +1,6 @@
 #include "common.h"
 #include "game.h"
+#include <cstdlib>
 
 bool sprite_overlap_check(
     size_t x_a, size_t y_a, size_t width_a, size_t height_a,
@@ -26,10 +27,10 @@ void update_player(Game *game, int move_dir, size_t player_width)
     }
 }
 
-// bullet->dir = 2 -> Up (to the monsters), 
+// bullet->dir = 2 -> Up (to the monsters),
 void update_bullets(Game *game, size_t bullet_height)
 {
-    for (size_t bi = 0; bi < game->num_bullets; )
+    for (size_t bi = 0; bi < game->num_bullets;)
     {
         game->bullets[bi].y += game->bullets[bi].dir;
 
@@ -61,11 +62,33 @@ void update_aliens(Game *game, uint8_t *death_counters)
 
 void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
                       size_t alien_width, size_t alien_height,
-                      size_t death_width, size_t *score)
+                      size_t death_width, size_t *score,
+                      size_t player_width, size_t player_height)
 {
     for (size_t bi = 0; bi < game->num_bullets;)
     {
         bool bullet_destroyed = false;
+        if (!game->bullets[bi].from_player)
+        {
+            if (sprite_overlap_check(game->bullets[bi].x, game->bullets[bi].y, 1, 3,
+                                     game->player.x, game->player.y, player_width, player_height))
+            {
+                if (game->player.life > 0)
+                    game->player.life--;
+
+                // Remove bullet
+                game->bullets[bi] = game->bullets[game->num_bullets - 1];
+                game->num_bullets--;
+
+                if (game->player.life == 0)
+                {
+                    game->state = STATE_LOST;
+                    break;
+                }
+            }
+            bi++;
+            continue;
+        }
 
         for (size_t ai = 0; ai < game->num_aliens; ++ai)
         {
@@ -98,4 +121,35 @@ void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
             ++bi;
         }
     }
+}
+
+void update_alien_firing(Game *game)
+{
+    // Only fire sometimes 10%
+    if (game->num_bullets < GAME_MAX_BULLETS && (rand() % 100 == 0))
+    {
+        size_t index = rand() % game->num_aliens;
+        Alien &a = game->aliens[index];
+
+        if (a.type != ALIEN_DEAD)
+        {
+            Bullet &b = game->bullets[game->num_bullets++];
+            b.x = a.x + 5; // from alien's center
+            b.y = a.y+10;
+            b.dir = -2; // Moving down
+            b.from_player = false;
+        }
+    }
+}
+
+void check_win_condition(Game *game)
+{
+    size_t active_aliens = 0;
+    for (size_t i = 0; i < game->num_aliens; i++)
+    {
+        if (game->aliens[i].type != ALIEN_DEAD)
+            active_aliens++;
+    }
+    if (active_aliens == 0)
+        game->state = STATE_WON;
 }

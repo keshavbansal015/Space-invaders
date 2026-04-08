@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <chrono>
+#include <thread>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -193,6 +195,7 @@ int main(int argc, char *argv[])
 
     // Initialize Game State
     Game game;
+    game.state = STATE_PLAYING;
     game.width = buffer_width;
     game.height = buffer_height;
     game.num_bullets = 0;
@@ -226,6 +229,24 @@ int main(int argc, char *argv[])
     while (!glfwWindowShouldClose(window) && game_running)
     {
 
+        if (game.state == STATE_WON || game.state == STATE_LOST)
+        {
+            buffer_clear(&buffer, (game.state == STATE_WON) ? rgb_to_uint32(0, 255, 0) : rgb_to_uint32(255, 0, 0));
+
+            const char *msg = (game.state == STATE_WON) ? "YOU WIN!" : "GAME OVER";
+            buffer_draw_text(&buffer, text_spritesheet, msg, 80, 128, rgb_to_uint32(255, 255, 255));
+
+            // Display the final buffer to the GPU
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, buffer.width, buffer.height, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, buffer.data);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glfwSwapBuffers(window);
+
+            // Pause so the user can see the message
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            game_running = false;
+            continue; // Skip the rest of the loop
+        }
+
         buffer_clear(&buffer, clear_color);
 
         buffer_draw_text(
@@ -246,19 +267,31 @@ int main(int argc, char *argv[])
             164, 7,
             rgb_to_uint32(128, 0, 0));
 
+        // Draw the static label
+        buffer_draw_text(&buffer, text_spritesheet, "HEALTH:",
+                         4, 7, rgb_to_uint32(128, 0, 0));
+
+        // Draw the dynamic life count
+        // (Each character is 5px wide + 1px padding, so 'HEALTH: ' is ~48 pixels)
+        buffer_draw_number(&buffer, number_spritesheet, game.player.life,
+                           52, 7, rgb_to_uint32(128, 0, 0));
+
         // 1. SIMULATION (Using game.cpp functions)
         update_player(&game, move_dir, player_sprite.width);
+        update_alien_firing(&game);
+        // check_player_hit(&game, player_sprite.width, player_sprite.height);
         update_bullets(&game, bullet_sprite.height);
 
         // Pass relevant widths for collision math
         check_collisions(&game, bullet_sprite.width, bullet_sprite.height,
-                         11, 8, alien_death_sprite.width, &score);
+                         11, 8, alien_death_sprite.width, &score,
+                         player_sprite.width, player_sprite.height);
 
         update_aliens(&game, death_counters);
-
+        check_win_condition(&game);
         if (fire_pressed && game.num_bullets < GAME_MAX_BULLETS)
         {
-            game.bullets[game.num_bullets] = {game.player.x + player_sprite.width / 2, game.player.y + player_sprite.height, 2};
+            game.bullets[game.num_bullets] = {game.player.x + player_sprite.width / 2, game.player.y + player_sprite.height, 2, true};
             game.num_bullets++;
             fire_pressed = false;
         }
