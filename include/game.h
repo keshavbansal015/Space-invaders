@@ -5,8 +5,15 @@
 #include <cstdint>
 #include "common.h" // Needed for ALIEN_DEAD and GAME_MAX_BULLETS
 
-// --- Entity Structures ---
+// -- Game State --
+enum GameState : uint8_t
+{
+    STATE_PLAYING = 0,
+    STATE_WON = 1,
+    STATE_LOST = 2
+};
 
+// --- Entity Structures ---
 struct Alien
 {
     size_t x, y;
@@ -23,6 +30,7 @@ struct Bullet
 {
     size_t x, y;
     int dir;
+    bool from_player;
 };
 
 // --- Main Game State ---
@@ -32,6 +40,7 @@ struct Game
     size_t width, height;
     size_t num_aliens;
     size_t num_bullets;
+    GameState state;
     Alien *aliens; // Dynamically allocated in main.cpp
     Player player;
     Bullet bullets[GAME_MAX_BULLETS];
@@ -48,10 +57,15 @@ bool sprite_overlap_check(
 void update_player(Game *game, int move_dir, size_t player_width);
 void update_bullets(Game *game, size_t bullet_height);
 // void update_alients(Game *game, size_t bullet_width, size_t bullet_height,
-                    // size_t alien_width, size_t alien_height);
+// size_t alien_width, size_t alien_height);
 void update_aliens(Game *game, uint8_t *death_counters);
 void check_collisions(Game *game, size_t bullet_width, size_t bullet_height,
                       size_t alien_width, size_t alien_height,
-                      size_t death_width, size_t *score);
+                      size_t death_width, size_t *score,
+                      size_t player_width, size_t player_height);
+
+void update_alien_firing(Game *game);
+void check_player_hit(Game *game, size_t player_width, size_t player_height);
+void check_win_condition(Game *game);
 
 #endif
